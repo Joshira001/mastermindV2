@@ -19,8 +19,8 @@ dificultad = ("Fácil", "Normal", "Difícil")
 segundos = 0
 
 mastermind = tk.Tk()
-mastermind.title("MasterMind")
-mastermind.geometry("640x360")
+mastermind.title("MasterMindV2")
+mastermind.geometry("650x356")
 mastermind.config(background = "black")
 
 base_path = os.path.dirname(os.path.abspath(__file__))
@@ -54,13 +54,13 @@ def animar(ventana, label, frames, delay=100, ind=0):
     ventana.after(delay, animar, ventana, label, frames, delay, ind)
 animar(mastermind, label_fondo, frames)
 
-ruta_titulo = os.path.join(base_path, "mastermind_titulo.png")
+ruta_titulo = os.path.join(base_path, "mastermind_titulo.jpg")
 imagen = Image.open(ruta_titulo)
-imagen = imagen.resize((220, 70))
+imagen = imagen.resize((220, 40))
 titulo_tk = ImageTk.PhotoImage(imagen)
 
 label_titulo = tk.Label(mastermind, image=titulo_tk, bg="#764085", borderwidth=0)
-label_titulo.place(x=230,y=20)
+label_titulo.place(x=210,y=20)
 
 def video_victoria():
     ruta_base = os.path.dirname(os.path.abspath(__file__))
@@ -109,7 +109,7 @@ def jugar():
     SALIDAS: CREA UNA NUEVA VENTANA CON EL TABLERO, PANEL DE ELEMENTOS, BOTONES DE CONTROL E INICIA LA LÓGICA DEL JUEGO. """
 
     juego = tk.Toplevel(mastermind)
-    juego.title("MasterMind: JUGAR")
+    juego.title("MasterMindV2: JUGAR")
     juego.geometry("1000x600")
     juego.config(background="black")
     #copy paste de lo del gif, solo lo adapté
@@ -122,11 +122,11 @@ def jugar():
 
     animar(juego, label_fondo_juego, frames_juego)
     
-    ruta_titulo = os.path.join(base_path, "mastermind_titulo.png")
+    ruta_titulo = os.path.join(base_path, "mastermind_titulo.jpg")
     imagen = Image.open(ruta_titulo)
     imagen = imagen.resize((200, 60))
     titulo_tk = ImageTk.PhotoImage(imagen)
-    label_titulo = tk.Label(juego, image=titulo_tk, background = "light blue", borderwidth=0)
+    label_titulo = tk.Label(juego, image=titulo_tk, background = "black", borderwidth=0)
     label_titulo.image = titulo_tk
     label_titulo.place(x=400, y=20)
 
@@ -138,7 +138,7 @@ def jugar():
         datos_configuracion.append(dificultad[2]) 
     tk.Label(juego, text=f"NIVEL: {datos_configuracion[0]}", font=("Impact", 12), fg="white", bg="black").place(x=430, y=550)
 
-    ruta_borrador = os.path.join(base_path, "borrador.jpg")
+    ruta_borrador = os.path.join(base_path, "borrador.png")
     borr = Image.open(ruta_borrador)
     borr = borr.resize((60, 60))
     borrador_tk = ImageTk.PhotoImage(borr)
@@ -165,6 +165,14 @@ def jugar():
     save = Image.open(ruta_guardar)
     save = save.resize((80, 80))
     guardar_tk = ImageTk.PhotoImage(save)
+    ruta_deshacer = os.path.join(base_path, "deshacer.jpg")
+    deshacer = Image.open(ruta_deshacer)
+    deshacer = deshacer.resize((80, 80))
+    deshacer_tk = ImageTk.PhotoImage(deshacer)
+    ruta_rehacer = os.path.join(base_path, "rehacer.jpg")
+    rehacer = Image.open(ruta_rehacer)
+    rehacer = rehacer.resize((80, 80))
+    rehacer_tk = ImageTk.PhotoImage(rehacer)
 
     if not datos_configuracion:
         datos_configuracion[:] = ["Difícil", "colores", "No", "Derecha"]
@@ -501,8 +509,8 @@ def jugar():
     boton_calificar = tk.Button(juego, image=calificar_tk, command=calificar, bg="black", cursor="hand2")
     boton_calificar.image = calificar_tk
     boton_calificar.place(x=370, y=450)
-    ruta_reloj = os.path.join(base_path, "reloj.png")
-    imagen_reloj = Image.open(ruta_reloj).resize((130, 130))
+    ruta_reloj = os.path.join(base_path, "reloj.jpg")
+    imagen_reloj = Image.open(ruta_reloj).resize((180, 110))
     imagen_reloj_tk = ImageTk.PhotoImage(imagen_reloj)
 
     frame_reloj = tk.Frame(juego, bg="light blue")
@@ -513,7 +521,7 @@ def jugar():
     label_img_reloj.pack()
 
     label_tiempo = tk.Label(frame_reloj, text="00:00:00", font=("Consolas", 10, "bold"), fg="white", bg="black")
-    label_tiempo.place(x=35, y=50)
+    label_tiempo.place(x=55, y=45)
 
     tiempo_transcurrido = 0
     tiempo_restante = 0
@@ -774,6 +782,25 @@ def jugar():
                 else:
                     casilla_canvas.unbind("<Button-1>")
 
+    def deshacer_movimiento():
+        mensaje = tk.Label(juego, text="DESHACER PRESIONADO",
+                        font=("Impact", 14), fg="yellow", bg="black")
+        mensaje.place(x=400, y=520)
+        juego.after(1500, mensaje.destroy)
+    boton_deshacer = tk.Button(juego, image=deshacer_tk,command=deshacer_movimiento,bg="black", cursor="hand2", bd=0)
+    boton_deshacer.image = deshacer_tk
+    boton_deshacer.place(x=850, y=450)
+
+    def rehacer_movimiento():
+        mensaje = tk.Label(juego, text="REHACER PRESIONADO",
+                        font=("Impact", 14), fg="cyan", bg="black")
+        mensaje.place(x=400, y=550)
+        juego.after(1500, mensaje.destroy)
+        
+    boton_rehacer = tk.Button(juego, image=rehacer_tk,command=rehacer_movimiento,bg="black", cursor="hand2", bd=0)
+    boton_rehacer.image = rehacer_tk
+    boton_rehacer.place(x=850, y=350)
+
     def iniciar_juego():
         nombre_jugador = nombre_entry.get().strip()
         if len(nombre_jugador) < 2 or len(nombre_jugador) > 30:
@@ -809,7 +836,7 @@ def configurar():
     SALIDAS: GUARDA LAS OPCIONES ELEGIDAS EN EL ARCHIVO ‘mastermind2025configuracion.dat’ Y ACTUALIZA LA LISTA DE CONFIGURACIÓN.  """
 
     configuracion = tk.Toplevel(mastermind)
-    configuracion.title("MasterMind: Configurar")
+    configuracion.title("MasterMindV2: Configurar")
     configuracion.geometry("700x400")
 
     base_path = os.path.dirname(__file__)  
@@ -1034,9 +1061,9 @@ def ayuda():
 def acerca_de():
     messagebox.showinfo(
         "ACERCA DE",
-        "NOMBRE DEL PROGRAMA: MASTERMIND  \n"
+        "NOMBRE DEL PROGRAMA: MASTERMINDV2  \n"
         "VERSIÓN DE PYTHON: 3.13.3  \n" 
-        "FECHA DE CREACIÓN: 01/11/2025  \n"
+        "FECHA DE CREACIÓN: 01/12/2025  \n"
         "AUTOR: JOSHUA BRENES HERNÁNDEZ")
 
 def salir():
