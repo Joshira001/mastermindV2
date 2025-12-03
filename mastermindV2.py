@@ -59,7 +59,7 @@ imagen = Image.open(ruta_titulo)
 imagen = imagen.resize((220, 40))
 titulo_tk = ImageTk.PhotoImage(imagen)
 
-label_titulo = tk.Label(mastermind, image=titulo_tk, bg="#764085", borderwidth=0)
+label_titulo = tk.Label(mastermind, image=titulo_tk, bg="black", borderwidth=0)
 label_titulo.place(x=210,y=20)
 
 def video_victoria():
@@ -107,6 +107,8 @@ def jugar():
     """FUNCIÓN: ABRE LA INTERFAZ GRÁFICA PARA INICIAR EL JUEGO  
     ENTRADAS: NINGUNA (SE ACTIVA DESDE EL MENÚ PRINCIPAL O EL BOTÓN “JUGAR”).  
     SALIDAS: CREA UNA NUEVA VENTANA CON EL TABLERO, PANEL DE ELEMENTOS, BOTONES DE CONTROL E INICIA LA LÓGICA DEL JUEGO. """
+    jugadas_realizadas = []
+    jugadas_deshechas = []
 
     juego = tk.Toplevel(mastermind)
     juego.title("MasterMindV2: JUGAR")
@@ -124,7 +126,7 @@ def jugar():
     
     ruta_titulo = os.path.join(base_path, "mastermind_titulo.jpg")
     imagen = Image.open(ruta_titulo)
-    imagen = imagen.resize((200, 60))
+    imagen = imagen.resize((220, 40))
     titulo_tk = ImageTk.PhotoImage(imagen)
     label_titulo = tk.Label(juego, image=titulo_tk, background = "black", borderwidth=0)
     label_titulo.image = titulo_tk
@@ -231,11 +233,25 @@ def jugar():
         tipo_elemento = elemento_seleccionado.get("tipo")
         valor_elemento = elemento_seleccionado.get("valor")
 
+        fila_activa = lista_jugadas[jugada_actual[0]][:combinacion_local]
+        if evento.widget not in fila_activa:
+            return
+
         if tipo_elemento is None or valor_elemento is None:
             messagebox.showwarning("ADVERTENCIA", "Debe seleccionar un elemento antes de colocar.")
             return
 
         casilla_canvas = evento.widget
+        elementos_previos = casilla_canvas.find_all()
+        if elementos_previos:
+            tipo_prev = casilla_canvas.type(elementos_previos[0])
+            if tipo_prev == "oval":
+                valor_previo = casilla_canvas.itemcget(elementos_previos[0], "fill")
+            else:
+                valor_previo = casilla_canvas.itemcget(elementos_previos[0], "text")
+        else:
+            valor_previo = None
+        jugadas_realizadas.append((casilla_canvas, valor_previo))
         casilla_canvas.delete("all")
 
         if tipo_elemento == "colores":
@@ -246,7 +262,6 @@ def jugar():
 
         elif tipo_elemento == "borrador":
             casilla_canvas.create_oval(5, 5, 25, 25, fill="white", outline="black")
-            return
 
     if datos_configuracion[3] == "Izquierda":
         panel_elementos = tk.Frame(juego, bg="black", width=130, height=350)
@@ -284,6 +299,10 @@ def jugar():
             elementos_visibles.append((boton_valor, str(valor_mostrado)))
 
     def calificar():
+        mensaje = tk.Label(juego, text="CALIFICAR PRESIONADO",font=("Impact", 14), fg="white", bg="black")
+        mensaje.place(x=400, y=520)
+        juego.after(1500, mensaje.destroy)
+
         if juego.combinacion_local_secreta is None:
             messagebox.showwarning("ADVERTENCIA", "DEBE INICIAR EL JUEGO ANTES DE CALIFICAR.")
             return
@@ -325,7 +344,6 @@ def jugar():
             valor_secreto = str(combinacion_secreta[posicion]).strip().lower()
             if valor_jugador == valor_secreto:
                 cantidad_exactos += 1
-
 
         total_casillas_calificacion = combinacion_local
         inicio_calificacion = combinacion_local
@@ -479,6 +497,8 @@ def jugar():
             juego.after(4000, lambda: [messagebox.showinfo("JUEGO TERMINADO", "¡FELICITACIONES, USTED HA GANADO!"),juego.destroy()])
             return
 
+        jugadas_realizadas.clear()
+        jugadas_deshechas.clear()
 
         jugada_actual[0] += 1
         if jugada_actual[0] >= cantidad_jugadas:
@@ -576,6 +596,10 @@ def jugar():
             frame_reloj.place_forget()
 
     def cancelar():
+        mensaje = tk.Label(juego, text="CANCELAR PRESIONADO",font=("Impact", 14), fg="red", bg="black")
+        mensaje.place(x=400, y=520)
+        juego.after(1500, mensaje.destroy)
+
         if iniciar["state"] == "disabled":
             respuesta = messagebox.askyesno("CANCELAR", "¿ESTÁ SEGURO DE CANCELAR EL JUEGO?")
             if respuesta:
@@ -587,6 +611,10 @@ def jugar():
     cancelar.place(x=490, y=450)
 
     def guardar():
+        mensaje = tk.Label(juego, text="GUARDAR PRESIONADO",font=("Impact", 14), fg="pink", bg="black")
+        mensaje.place(x=400, y=520)
+        juego.after(1500, mensaje.destroy)
+
         if iniciar["state"] != "disabled":
             messagebox.showwarning("ADVERTENCIA", "DEBE INICIAR EL JUEGO ANTES DE GUARDAR.")
             return
@@ -665,6 +693,10 @@ def jugar():
     guardar.place(x=610, y=450)
 
     def cargar():
+        mensaje = tk.Label(juego, text="CARGAR PRESIONADO",font=("Impact", 14), fg="green", bg="black")
+        mensaje.place(x=400, y=520)
+        juego.after(1500, mensaje.destroy)
+
         if iniciar["state"] == "disabled":
             messagebox.showwarning("ADVERTENCIA", "NO PUEDE CARGAR UNA PARTIDA MIENTRAS EL JUEGO ESTÁ EN CURSO.")
             return
@@ -769,7 +801,7 @@ def jugar():
     def usar_borrador():
         elemento_seleccionado["tipo"] = "borrador"
         elemento_seleccionado["valor"] = "white"
-    borrador = tk.Button(juego, image=borrador_tk, command=usar_borrador, bg="black", cursor="hand2", activebackground="white")
+    borrador = tk.Button(juego, image=borrador_tk, command=usar_borrador, bg="black", cursor="hand2")
     borrador.image = borrador_tk
     borrador.place(x=900, y=20)
 
@@ -783,25 +815,85 @@ def jugar():
                     casilla_canvas.unbind("<Button-1>")
 
     def deshacer_movimiento():
-        mensaje = tk.Label(juego, text="DESHACER PRESIONADO",
-                        font=("Impact", 14), fg="yellow", bg="black")
+
+        mensaje = tk.Label(juego, text="DESHACER PRESIONADO",font=("Impact", 14), fg="yellow", bg="black")
         mensaje.place(x=400, y=520)
         juego.after(1500, mensaje.destroy)
+
+        fila_activa = lista_jugadas[jugada_actual[0]][:combinacion_local]
+        if not jugadas_realizadas:
+            return
+
+        casilla_canvas, valor_previo = jugadas_realizadas[-1]
+
+        if casilla_canvas not in fila_activa:
+            return
+
+        jugadas_realizadas.pop()
+
+        elementos_actuales = casilla_canvas.find_all()
+        if not elementos_actuales:
+            estado_actual = None
+        else:
+            tipo = casilla_canvas.type(elementos_actuales[0])
+            estado_actual = casilla_canvas.itemcget(elementos_actuales[0],"fill" if tipo == "oval" else "text")
+
+        jugadas_deshechas.append((casilla_canvas, estado_actual))
+        casilla_canvas.delete("all")
+
+        if valor_previo is None or valor_previo.lower() == "white":
+            casilla_canvas.create_oval(5, 5, 25, 25,fill="white", outline="black")
+        elif isinstance(valor_previo, str) and valor_previo.startswith("#"):
+            casilla_canvas.create_oval(5, 5, 25, 25,fill=valor_previo, outline="black")
+        else:
+            casilla_canvas.create_text(15, 15,text=valor_previo,font=("Impact", 12),fill="black")
+        
     boton_deshacer = tk.Button(juego, image=deshacer_tk,command=deshacer_movimiento,bg="black", cursor="hand2", bd=0)
     boton_deshacer.image = deshacer_tk
-    boton_deshacer.place(x=850, y=450)
+    boton_deshacer.place(x=830, y=150)
 
     def rehacer_movimiento():
-        mensaje = tk.Label(juego, text="REHACER PRESIONADO",
-                        font=("Impact", 14), fg="cyan", bg="black")
-        mensaje.place(x=400, y=550)
+        mensaje = tk.Label(juego, text="REHACER PRESIONADO",font=("Impact", 14), fg="cyan", bg="black")
+        mensaje.place(x=400, y=520)
         juego.after(1500, mensaje.destroy)
+
+        if not jugadas_deshechas:
+            return
+
+        casilla_canvas, valor_rehacer = jugadas_deshechas[-1]
+
+        fila_activa = lista_jugadas[jugada_actual[0]][:combinacion_local]
+        if casilla_canvas not in fila_activa:
+            return
+
+        jugadas_deshechas.pop()
+
+        elementos_actuales = casilla_canvas.find_all()
+        if not elementos_actuales:
+            estado_actual = None
+        else:
+            tipo = casilla_canvas.type(elementos_actuales[0])
+            estado_actual = casilla_canvas.itemcget(elementos_actuales[0],"fill" if tipo == "oval" else "text")
+
+        jugadas_realizadas.append((casilla_canvas, estado_actual))
+        casilla_canvas.delete("all")
+
+        if valor_rehacer is None or valor_rehacer.lower() == "white":
+            casilla_canvas.create_oval(5, 5, 25, 25, fill="white", outline="black")
+        elif isinstance(valor_rehacer, str) and valor_rehacer.startswith("#"):
+            casilla_canvas.create_oval(5, 5, 25, 25, fill=valor_rehacer, outline="black")
+        else:
+            casilla_canvas.create_text(15, 15, text=valor_rehacer,font=("Impact", 12), fill="black")
         
     boton_rehacer = tk.Button(juego, image=rehacer_tk,command=rehacer_movimiento,bg="black", cursor="hand2", bd=0)
     boton_rehacer.image = rehacer_tk
-    boton_rehacer.place(x=850, y=350)
+    boton_rehacer.place(x=830, y=300)
 
     def iniciar_juego():
+        mensaje = tk.Label(juego, text="A JUGAR",font=("Impact", 16), fg="yellow", bg="black")
+        mensaje.place(x=500, y=520)
+        juego.after(3000, mensaje.destroy)
+
         nombre_jugador = nombre_entry.get().strip()
         if len(nombre_jugador) < 2 or len(nombre_jugador) > 30:
             messagebox.showerror("ERROR", "EL NOMBRE DEBE ESTAR ENTRE 2 Y 30 CARACTERES")
@@ -1051,11 +1143,11 @@ def top_10_detalle():
 def ayuda():
     """FUNCIÓN: MOSTRAR AYUDA AL USUARIO  
     ENTRADAS: EVENTO DEL MENÚ O BOTÓN “AYUDA”.  
-    SALIDAS: ABRE EL ARCHIVO ‘manual_de_usuario_mastermind.pdf’ QUE EXPLICA CÓMO USAR EL PROGRAMA."""
+    SALIDAS: ABRE EL ARCHIVO ‘manual_de_usuario_mastermindV2.PDF’ QUE EXPLICA CÓMO USAR EL PROGRAMA."""
 
     messagebox.showinfo("AYUDA", "Ejecutando el manual del usuario...")
     base_path = os.path.dirname(os.path.abspath(__file__))
-    manual = os.path.join(base_path, "manual_de_usuario_mastermind.pdf")
+    manual = os.path.join(base_path, "manual_de_usuario_mastermindV2.PDF")
     os.startfile(manual)
 
 def acerca_de():
