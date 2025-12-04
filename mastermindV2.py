@@ -533,10 +533,10 @@ def jugar():
     imagen_reloj = Image.open(ruta_reloj).resize((180, 110))
     imagen_reloj_tk = ImageTk.PhotoImage(imagen_reloj)
 
-    frame_reloj = tk.Frame(juego, bg="light blue")
+    frame_reloj = tk.Frame(juego, bg="black")
     frame_reloj.place(x=0, y=0)
 
-    label_img_reloj = tk.Label(frame_reloj, image=imagen_reloj_tk, bg="light blue", borderwidth=0)
+    label_img_reloj = tk.Label(frame_reloj, image=imagen_reloj_tk, bg="black", borderwidth=0)
     label_img_reloj.image = imagen_reloj_tk
     label_img_reloj.pack()
 
@@ -669,7 +669,7 @@ def jugar():
             f"jugada_actual: {informacion_partida['numero_jugada_actual']}"
         ]
 
-        numero_jugada_guardada = 1
+        numero_jugada_guardada = 0
         for jugada_guardada in informacion_partida["lista_jugadas_guardadas"]:
             valores_convertidos = []
             for valor in jugada_guardada:
@@ -706,7 +706,7 @@ def jugar():
             messagebox.showwarning("ADVERTENCIA", "DEBE INDICAR EL NOMBRE DEL JUGADOR ANTES DE CARGAR.")
             return
 
-        ruta_archivo_guardado = "mastermind2025juegoactual.dat"
+        ruta_archivo_guardado = os.path.join(base_path, "mastermind2025juegoactual.dat")
         if not os.path.exists(ruta_archivo_guardado):
             messagebox.showwarning("ADVERTENCIA", "NO EXISTE NINGÚN JUEGO GUARDADO.")
             return
@@ -762,38 +762,54 @@ def jugar():
         datos_configuracion[:] = [dificultad_restaurada, elementos_restaurados, reloj_restaurado, posicion_panel]
 
         jugadas_restauradas = []
-        for clave_guardada, valor_guardado in valores_restaurados.items():
-            if clave_guardada.startswith("jugada_"):
-                valores_jugada = []
-                for valor_texto in valor_guardado.split(","):
-                    if valor_texto == "None":
-                        valores_jugada.append(None)
-                    else:
-                        valores_jugada.append(valor_texto)
-                jugadas_restauradas.append(valores_jugada)
+        for clave, texto in valores_restaurados.items():
 
-        for indice_jugada, fila_restaurada in enumerate(jugadas_restauradas):
-            if indice_jugada >= len(lista_jugadas):
+            if not clave.startswith("jugada_"):
+                continue
+
+            sufijo = clave.replace("jugada_", "").strip()
+            if not sufijo.isdigit():
+                continue
+
+            numero_jugada = int(sufijo)
+            valores_crudos = texto.split(",")
+
+            fila_convertida = []
+            for valor in valores_crudos:
+                valor_limpio = valor.strip().lower()
+
+                if valor_limpio in ("none", "white", ""):
+                    fila_convertida.append(None)
+                else:
+                    fila_convertida.append(valor)
+
+            jugadas_restauradas.append((numero_jugada, fila_convertida))
+
+        jugadas_restauradas.sort(key=lambda par: par[0])
+
+        for indice, (num_fila, fila_valores) in enumerate(jugadas_restauradas):
+            if indice >= len(lista_jugadas):
                 break
-            fila_actual = lista_jugadas[indice_jugada]
-            for posicion_columna, valor_guardado in enumerate(fila_restaurada[:combinacion_local]):
-                casilla_canvas = fila_actual[posicion_columna]
-                casilla_canvas.delete("all")
+
+            fila_canvas = lista_jugadas[indice]
+            for columna, valor_guardado in enumerate(fila_valores[:combinacion_local]):
+
+                casilla = fila_canvas[columna]
+                casilla.delete("all")
+
                 if valor_guardado is None:
                     continue
+
                 if tipo_de_elementos == "colores":
-                    if valor_guardado in elementos["colores"].values():
-                        casilla_canvas.create_oval(5, 5, 25, 25, fill=valor_guardado, outline="black")
-                elif tipo_de_elementos == "numeros":
-                    if valor_guardado.isdigit():
-                        casilla_canvas.create_text(15, 15, text=valor_guardado, font=("Impact", 12), fill="black")
-                elif tipo_de_elementos == "letras":
-                    if valor_guardado.isalpha():
-                        casilla_canvas.create_text(15, 15, text=valor_guardado, font=("Impact", 12), fill="black")
+                    casilla.create_oval(5, 5, 25, 25, fill=valor_guardado, outline="black")
+                else:
+                    casilla.create_text(15, 15, text=valor_guardado, font=("Impact", 12), fill="black")
 
         jugada_actual[0] = numero_jugada_restaurada
         messagebox.showinfo("CARGAR JUEGO", f"PARTIDA DE {nombre_jugador.upper()} CARGADA CORRECTAMENTE.\n\nNIVEL: {dificultad_restaurada.upper()}\nELEMENTOS: {elementos_restaurados.upper()}\nRELOJ: {reloj_restaurado.upper()}")
         
+        habilitar_fila(jugada_actual[0])
+
     cargar = tk.Button(juego, image=cargar_tk, command= cargar, bg ="black", cursor = "hand2")
     cargar.image = cargar_tk
     cargar.place(x=730, y=450)
@@ -841,12 +857,15 @@ def jugar():
         jugadas_deshechas.append((casilla_canvas, estado_actual))
         casilla_canvas.delete("all")
 
-        if valor_previo is None or valor_previo.lower() == "white":
-            casilla_canvas.create_oval(5, 5, 25, 25,fill="white", outline="black")
-        elif isinstance(valor_previo, str) and valor_previo.startswith("#"):
-            casilla_canvas.create_oval(5, 5, 25, 25,fill=valor_previo, outline="black")
-        else:
-            casilla_canvas.create_text(15, 15,text=valor_previo,font=("Impact", 12),fill="black")
+        if valor_previo is None:
+            return
+
+        if isinstance(valor_previo, str) and valor_previo.startswith("#"):
+            casilla_canvas.create_oval(5, 5, 25, 25, fill=valor_previo, outline="black")
+
+        elif valor_previo.isdigit() or valor_previo.isalpha():
+            casilla_canvas.create_text(15, 15, text=valor_previo, font=("Impact", 12), fill="black")
+
         
     boton_deshacer = tk.Button(juego, image=deshacer_tk,command=deshacer_movimiento,bg="black", cursor="hand2", bd=0)
     boton_deshacer.image = deshacer_tk
@@ -878,12 +897,14 @@ def jugar():
         jugadas_realizadas.append((casilla_canvas, estado_actual))
         casilla_canvas.delete("all")
 
-        if valor_rehacer is None or valor_rehacer.lower() == "white":
-            casilla_canvas.create_oval(5, 5, 25, 25, fill="white", outline="black")
-        elif isinstance(valor_rehacer, str) and valor_rehacer.startswith("#"):
+        if valor_rehacer is None:
+            return
+
+        if isinstance(valor_rehacer, str) and valor_rehacer.startswith("#"):
             casilla_canvas.create_oval(5, 5, 25, 25, fill=valor_rehacer, outline="black")
-        else:
-            casilla_canvas.create_text(15, 15, text=valor_rehacer,font=("Impact", 12), fill="black")
+
+        elif valor_rehacer.isdigit() or valor_rehacer.isalpha():
+            casilla_canvas.create_text(15, 15, text=valor_rehacer, font=("Impact", 12), fill="black")
         
     boton_rehacer = tk.Button(juego, image=rehacer_tk,command=rehacer_movimiento,bg="black", cursor="hand2", bd=0)
     boton_rehacer.image = rehacer_tk
@@ -929,7 +950,7 @@ def configurar():
 
     configuracion = tk.Toplevel(mastermind)
     configuracion.title("MasterMindV2: Configurar")
-    configuracion.geometry("700x400")
+    configuracion.geometry("650x356")
 
     base_path = os.path.dirname(__file__)  
     ruta_gif = os.path.join(base_path, "fondo.gif")  
@@ -943,25 +964,25 @@ def configurar():
     animar(configuracion, label_fondo, frames)
 
     tk.Label(configuracion, text="CONFIGURACIÓN DE MASTERMIND",
-             font=("Impact", 16), fg="white", bg="purple").pack(pady=10)
-    tk.Label(configuracion, text="Dificultad:", font=("Impact", 12), fg="white", bg="purple").pack()
+             font=("Impact", 16), fg="white", bg="black").pack(pady=10)
+    tk.Label(configuracion, text="Dificultad:", font=("Impact", 12), fg="white", bg="black").pack()
     opcion_nivel = tk.StringVar(value="Difícil")
     for nivel in dificultad:
-        tk.Radiobutton(configuracion, text=nivel, variable=opcion_nivel, value=nivel, font=("Impact", 12), fg="white", bg="purple", selectcolor="black").pack()
-    tk.Label(configuracion, text="Tipo de elementos:", font=("Impact", 12), fg="white", bg="purple").pack(pady=(10, 0))
+        tk.Radiobutton(configuracion, text=nivel, variable=opcion_nivel, value=nivel, font=("Impact", 12), fg="white", bg="black", selectcolor="black").pack()
+    tk.Label(configuracion, text="Tipo de elementos:", font=("Impact", 12), fg="white", bg="black").pack(pady=(10, 0))
     opciones = tk.StringVar(value="colores")
     for tipo in ["colores", "numeros", "letras"]:
-        tk.Radiobutton(configuracion, text=tipo.capitalize(), variable=opciones, value=tipo, font=("Impact", 12), fg="white", bg="purple", selectcolor="black").pack()
-    tk.Label(configuracion,text="Tipo de reloj:",font=("Impact", 12),fg="white",bg="purple").place(x=30, y=0)
+        tk.Radiobutton(configuracion, text=tipo.capitalize(), variable=opciones, value=tipo, font=("Impact", 12), fg="white", bg="black", selectcolor="black").pack()
+    tk.Label(configuracion,text="Tipo de reloj:",font=("Impact", 12),fg="white",bg="black").place(x=30, y=0)
     valor_tipo_reloj = tk.StringVar(value="No")
     opciones_reloj = [("Cronómetro", 20), ("Temporizador", 50), ("No", 80)]
     for nombre_opcion_reloj, posicion_y in opciones_reloj:
-        tk.Radiobutton(configuracion,text=nombre_opcion_reloj,variable=valor_tipo_reloj,value=nombre_opcion_reloj,font=("Impact", 12),fg="white",bg="purple",selectcolor="black").place(x=30, y=posicion_y)
-    tk.Label(configuracion, text="Posición de elementos:", font=("Impact", 12),fg="white", bg="purple").place(x=520, y=0)
+        tk.Radiobutton(configuracion,text=nombre_opcion_reloj,variable=valor_tipo_reloj,value=nombre_opcion_reloj,font=("Impact", 12),fg="white",bg="black",selectcolor="black").place(x=30, y=posicion_y)
+    tk.Label(configuracion, text="Posición:", font=("Impact", 12),fg="white", bg="black").place(x=520, y=0)
     valor_posicion = tk.StringVar(value="Derecha")
     opciones_posicion = [("Derecha", 30), ("Izquierda", 60)]
     for nombre_opcion, y in opciones_posicion:
-        tk.Radiobutton(configuracion, text=nombre_opcion,variable=valor_posicion, value=nombre_opcion,font=("Impact", 12), fg="white", bg="purple",selectcolor="black").place(x=520, y=y)
+        tk.Radiobutton(configuracion, text=nombre_opcion,variable=valor_posicion, value=nombre_opcion,font=("Impact", 12), fg="white", bg="black",selectcolor="black").place(x=520, y=y)
 
     def guardar_configuracion_en_archivo():
         with open(archivo_configuracion, "w", encoding="utf-8") as archivo:

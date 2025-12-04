@@ -42,3 +42,33 @@ jugada_5: white,white,white,white,white,white
 jugada_6: white,white,white,white,white,white
 jugada_7: white,white,white,white,white,white
 jugada_8: white,white,white,white,white,white
+---
+jugador: JOJO
+dificultad: Difícil
+elementos: numeros
+reloj: No
+combinacion_secreta: 1,4,1,1,1,3
+jugada_actual: 1
+jugada_1: 5,5,5,5,5,5
+jugada_2: white,white,white,white,white,white
+jugada_3: white,white,white,white,white,white
+jugada_4: white,white,white,white,white,white
+jugada_5: white,white,white,white,white,white
+jugada_6: white,white,white,white,white,white
+jugada_7: white,white,white,white,white,white
+jugada_8: white,white,white,white,white,white
+---
+jugador: goku
+dificultad: Difícil
+elementos: numeros
+reloj: No
+combinacion_secreta: 1,5,2,5,6,6
+jugada_actual: 1
+jugada_0: 6,6,6,6,6,6
+jugada_1: white,white,white,white,white,white
+jugada_2: white,white,white,white,white,white
+jugada_3: white,white,white,white,white,white
+jugada_4: white,white,white,white,white,white
+jugada_5: white,white,white,white,white,white
+jugada_6: white,white,white,white,white,white
+jugada_7: white,white,white,white,white,white
