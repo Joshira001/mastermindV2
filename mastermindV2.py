@@ -246,9 +246,21 @@ def jugar():
         if elementos_previos:
             tipo_prev = casilla_canvas.type(elementos_previos[0])
             if tipo_prev == "oval":
-                valor_previo = casilla_canvas.itemcget(elementos_previos[0], "fill")
+                color_detectado = casilla_canvas.itemcget(elementos_previos[0], "fill")
+
+                if color_detectado == "white":
+                    valor_previo = None
+                else:
+                    valor_previo = color_detectado
+
             else:
-                valor_previo = casilla_canvas.itemcget(elementos_previos[0], "text")
+                texto_detectado = casilla_canvas.itemcget(elementos_previos[0], "text")
+
+                if texto_detectado:
+                    valor_previo = texto_detectado
+                else:
+                    valor_previo = None
+
         else:
             valor_previo = None
         jugadas_realizadas.append((casilla_canvas, valor_previo))
@@ -323,7 +335,7 @@ def jugar():
                 continue
             tipo_elemento_dibujado = casilla.type(elementos_en_casilla[0])
             if tipo_elemento_dibujado == "oval":
-                color_detectado = casilla.itemcget(elementos_en_casilla[0], "fill").strip().lower()
+                color_detectado = casilla.itemcget(elementos_en_casilla[0], "fill").strip()
                 if color_detectado == "white":
                     valores_ingresados.append(None)
                 else:
@@ -341,7 +353,8 @@ def jugar():
 
         for posicion in range(combinacion_local):
             valor_jugador = str(valores_ingresados[posicion]).strip().lower()
-            valor_secreto = str(combinacion_secreta[posicion]).strip().lower()
+            valor_secreto = str(combinacion_secreta[posicion]).strip()
+
             if valor_jugador == valor_secreto:
                 cantidad_exactos += 1
 
@@ -352,11 +365,33 @@ def jugar():
             casilla_calificacion = fila_de_jugada[inicio_calificacion + posicion_calificacion]
             casilla_calificacion.delete("all")
 
-        colores_calificacion = ["white"] * total_casillas_calificacion
-        if cantidad_exactos > 0:
-            posiciones_negras = random.sample(range(total_casillas_calificacion), cantidad_exactos)
-            for posicion_en_negro in posiciones_negras:
-                colores_calificacion[posicion_en_negro] = "black"
+        colores_calificacion = []
+
+        exactos_marcados = [False] * combinacion_local
+        secreto_usado = [False] * combinacion_local
+
+        for pos in range(combinacion_local):
+            if valores_ingresados[pos] == combinacion_secreta[pos]:
+                colores_calificacion.append("black")
+                exactos_marcados[pos] = True
+                secreto_usado[pos] = True
+
+        for pos_jugada in range(combinacion_local):
+            if exactos_marcados[pos_jugada]:
+                continue
+
+            for pos_secreta in range(combinacion_local):
+                if secreto_usado[pos_secreta]:
+                    continue
+                if valores_ingresados[pos_jugada] == combinacion_secreta[pos_secreta]:
+                    colores_calificacion.append("#6E6E6E")
+                    secreto_usado[pos_secreta] = True
+                    break
+
+        while len(colores_calificacion) < combinacion_local:
+            colores_calificacion.append("white")
+
+        random.shuffle(colores_calificacion)
 
         for posicion_calificacion, color_final in enumerate(colores_calificacion):
             casilla_calificacion = fila_de_jugada[inicio_calificacion + posicion_calificacion]
@@ -832,80 +867,76 @@ def jugar():
 
     def deshacer_movimiento():
 
-        mensaje = tk.Label(juego, text="DESHACER PRESIONADO",font=("Impact", 14), fg="yellow", bg="black")
+        mensaje = tk.Label(juego, text="DESHACER PRESIONADO", font=("Impact", 14), fg="yellow", bg="black")
         mensaje.place(x=400, y=520)
         juego.after(1500, mensaje.destroy)
 
-        fila_activa = lista_jugadas[jugada_actual[0]][:combinacion_local]
         if not jugadas_realizadas:
             return
 
-        casilla_canvas, valor_previo = jugadas_realizadas[-1]
-
-        if casilla_canvas not in fila_activa:
-            return
-
-        jugadas_realizadas.pop()
-
+        casilla_canvas, valor_previo = jugadas_realizadas.pop()
         elementos_actuales = casilla_canvas.find_all()
+
         if not elementos_actuales:
             estado_actual = None
         else:
-            tipo = casilla_canvas.type(elementos_actuales[0])
-            estado_actual = casilla_canvas.itemcget(elementos_actuales[0],"fill" if tipo == "oval" else "text")
+            tipo_elemento = casilla_canvas.type(elementos_actuales[0])
+            if tipo_elemento == "oval":
+                color = casilla_canvas.itemcget(elementos_actuales[0], "fill")
+                estado_actual = None if color == "white" else color
+            else:
+                texto = casilla_canvas.itemcget(elementos_actuales[0], "text")
+                estado_actual = texto if texto else None
 
         jugadas_deshechas.append((casilla_canvas, estado_actual))
+
         casilla_canvas.delete("all")
 
         if valor_previo is None:
-            return
-
-        if isinstance(valor_previo, str) and valor_previo.startswith("#"):
+            casilla_canvas.create_oval(5, 5, 25, 25, fill="white", outline="black")
+        elif isinstance(valor_previo, str) and valor_previo.startswith("#"):
             casilla_canvas.create_oval(5, 5, 25, 25, fill=valor_previo, outline="black")
+        else:
+            casilla_canvas.create_text(15, 15, text=str(valor_previo), font=("Impact", 12), fill="black")
 
-        elif valor_previo.isdigit() or valor_previo.isalpha():
-            casilla_canvas.create_text(15, 15, text=valor_previo, font=("Impact", 12), fill="black")
-
-        
     boton_deshacer = tk.Button(juego, image=deshacer_tk,command=deshacer_movimiento,bg="black", cursor="hand2", bd=0)
     boton_deshacer.image = deshacer_tk
     boton_deshacer.place(x=830, y=150)
 
     def rehacer_movimiento():
-        mensaje = tk.Label(juego, text="REHACER PRESIONADO",font=("Impact", 14), fg="cyan", bg="black")
+
+        mensaje = tk.Label(juego, text="REHACER PRESIONADO", font=("Impact", 14), fg="cyan", bg="black")
         mensaje.place(x=400, y=520)
         juego.after(1500, mensaje.destroy)
 
         if not jugadas_deshechas:
             return
 
-        casilla_canvas, valor_rehacer = jugadas_deshechas[-1]
-
-        fila_activa = lista_jugadas[jugada_actual[0]][:combinacion_local]
-        if casilla_canvas not in fila_activa:
-            return
-
-        jugadas_deshechas.pop()
+        casilla_canvas, valor_rehacer = jugadas_deshechas.pop()
 
         elementos_actuales = casilla_canvas.find_all()
         if not elementos_actuales:
             estado_actual = None
         else:
             tipo = casilla_canvas.type(elementos_actuales[0])
-            estado_actual = casilla_canvas.itemcget(elementos_actuales[0],"fill" if tipo == "oval" else "text")
+            if tipo == "oval":
+                color = casilla_canvas.itemcget(elementos_actuales[0], "fill")
+                estado_actual = None if color == "white" else color
+            else:
+                txt = casilla_canvas.itemcget(elementos_actuales[0], "text")
+                estado_actual = txt if txt else None
 
         jugadas_realizadas.append((casilla_canvas, estado_actual))
+
         casilla_canvas.delete("all")
 
         if valor_rehacer is None:
-            return
-
-        if isinstance(valor_rehacer, str) and valor_rehacer.startswith("#"):
+            casilla_canvas.create_oval(5, 5, 25, 25, fill="white", outline="black")
+        elif isinstance(valor_rehacer, str) and valor_rehacer.startswith("#"):
             casilla_canvas.create_oval(5, 5, 25, 25, fill=valor_rehacer, outline="black")
+        else:
+            casilla_canvas.create_text(15, 15, text=str(valor_rehacer), font=("Impact", 12), fill="black")
 
-        elif valor_rehacer.isdigit() or valor_rehacer.isalpha():
-            casilla_canvas.create_text(15, 15, text=valor_rehacer, font=("Impact", 12), fill="black")
-        
     boton_rehacer = tk.Button(juego, image=rehacer_tk,command=rehacer_movimiento,bg="black", cursor="hand2", bd=0)
     boton_rehacer.image = rehacer_tk
     boton_rehacer.place(x=830, y=300)
