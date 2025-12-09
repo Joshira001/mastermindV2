@@ -12,8 +12,20 @@ datos_configuracion = []
 colores = {"azul": "#1F23F3", "mostaza": "#ECB731", "rojo": "#F31F1F", "verde": "#2CF325", "naranja": "#FC7A00", "amarillo": "#EEFF00"}
 numeros = (1, 2, 3, 4, 5, 6)
 letras= ("a", "b", "c", "d", "e", "f")
-elementos = {"colores": colores, "numeros": numeros, "letras": letras}
+elementos = {"colores": colores,"numeros": numeros,"letras": letras,"simbolos": [] }
 cantidad_jugadas = 8
+
+def obtener_elementos_segun_dificultad(tipo, dificultad):
+    limites = {"Fácil": 4, "Normal": 5, "Difícil": 6}
+    limite = limites.get(dificultad, 6)
+
+    if tipo == "colores":
+        return dict(list(colores.items())[:limite])
+    elif tipo == "numeros":
+        return numeros[:limite]
+    elif tipo == "letras":
+        return letras[:limite]
+    return []
 
 dificultad = ("Fácil", "Normal", "Difícil")
 segundos = 0
@@ -67,41 +79,61 @@ def video_victoria():
     ruta_video = os.path.join(ruta_base, "victoria.mp4")
     ruta_audio = os.path.join(ruta_base, "victoria.mp3")
 
-    if not os.path.exists(ruta_video):
+    if os.path.exists(ruta_audio):
+        try:
+            if not pygame.mixer.get_init():
+                pygame.mixer.init()
+            pygame.mixer.music.load(ruta_audio)
+            pygame.mixer.music.play()
+        except:
+            pass
+
+    captura = cv2.VideoCapture(ruta_video)
+    if not captura.isOpened():
+        messagebox.showerror("ERROR", "No se puede abrir victoria.mp4")
         return
 
     ventana_video = tk.Toplevel(mastermind)
     ventana_video.title("¡FELICITACIONES!")
-    ventana_video.geometry("848x592")
+    ventana_video.geometry("848x480")
     ventana_video.config(bg="black")
 
-    etiqueta_video = tk.Label(ventana_video)
-    etiqueta_video.pack(expand=True)
+    etiqueta_video = tk.Label(ventana_video, bg="black")
+    etiqueta_video.pack(expand=True, fill="both")
 
-    if os.path.exists(ruta_audio):
-        try:
-            pygame.mixer.init()
-            pygame.mixer.music.load(ruta_audio)
-            pygame.mixer.music.play()
-        except Exception:
-            pass
+    exito, frame = captura.read()
+    if not exito:
+        captura.release()
+        ventana_video.destroy()
+        return
 
-    captura = cv2.VideoCapture(ruta_video)
+    frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+    imagen = ImageTk.PhotoImage(Image.fromarray(frame))
+    etiqueta_video.config(image=imagen)
+    etiqueta_video.image = imagen
 
     def reproducir_frame():
         exito, frame = captura.read()
-        if exito:
-            frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
-            imagen = ImageTk.PhotoImage(Image.fromarray(frame))
-            etiqueta_video.config(image=imagen)
-            etiqueta_video.image = imagen
-            ventana_video.after(30, reproducir_frame)
-        else:
-            captura.release()
-            pygame.mixer.quit()
-            ventana_video.destroy()
 
-    reproducir_frame()
+        if not exito:
+            captura.release()
+            try:
+                pygame.mixer.music.stop()
+            except:
+                pass
+            ventana_video.destroy()
+            messagebox.showinfo("JUEGO TERMINADO", "¡FELICITACIONES, USTED HA GANADO!")
+            return
+
+        frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+        imagen = ImageTk.PhotoImage(Image.fromarray(frame))
+
+        etiqueta_video.config(image=imagen)
+        etiqueta_video.image = imagen
+
+        ventana_video.after(30, reproducir_frame)
+
+    ventana_video.after_idle(reproducir_frame)
 
 def jugar():
     """FUNCIÓN: ABRE LA INTERFAZ GRÁFICA PARA INICIAR EL JUEGO  
@@ -285,8 +317,10 @@ def jugar():
     elementos_visibles = []
     elemento_seleccionado = {"tipo": None, "valor": None}
 
+    elementos_restringidos = obtener_elementos_segun_dificultad(tipo_de_elementos, dificultad_actual)
+
     if tipo_de_elementos == "colores":
-        for nombre_color, codigo_hex in elementos["colores"].items():
+        for nombre_color, codigo_hex in elementos_restringidos.items():
             boton_color = tk.Button(panel_elementos,bg=codigo_hex,width=6,height=2,relief="raised",cursor="hand2",activebackground="light grey",borderwidth=2)
 
             def seleccionar_color(color=codigo_hex, nombre=nombre_color):
@@ -298,7 +332,7 @@ def jugar():
             elementos_visibles.append((boton_color, codigo_hex))
 
     else:
-        lista_de_elementos = list(elementos[tipo_de_elementos])
+        lista_de_elementos = list(elementos_restringidos)
         for valor_mostrado in lista_de_elementos:
             boton_valor = tk.Button(panel_elementos,text=str(valor_mostrado),width=6,height=2,font=("Impact", 12),bg="white",fg="black",relief="raised",cursor="hand2",activebackground="light grey",borderwidth=2)
 
@@ -352,7 +386,7 @@ def jugar():
         cantidad_exactos = 0
 
         for posicion in range(combinacion_local):
-            valor_jugador = str(valores_ingresados[posicion]).strip().lower()
+            valor_jugador = str(valores_ingresados[posicion]).strip()
             valor_secreto = str(combinacion_secreta[posicion]).strip()
 
             if valor_jugador == valor_secreto:
@@ -371,7 +405,7 @@ def jugar():
         secreto_usado = [False] * combinacion_local
 
         for pos in range(combinacion_local):
-            if valores_ingresados[pos] == combinacion_secreta[pos]:
+            if str(valores_ingresados[pos]) == str(combinacion_secreta[pos]):
                 colores_calificacion.append("black")
                 exactos_marcados[pos] = True
                 secreto_usado[pos] = True
@@ -383,7 +417,7 @@ def jugar():
             for pos_secreta in range(combinacion_local):
                 if secreto_usado[pos_secreta]:
                     continue
-                if valores_ingresados[pos_jugada] == combinacion_secreta[pos_secreta]:
+                if str(valores_ingresados[pos_jugada]) == str(combinacion_secreta[pos_secreta]):
                     colores_calificacion.append("#6E6E6E")
                     secreto_usado[pos_secreta] = True
                     break
@@ -528,8 +562,6 @@ def jugar():
                 archivo.write(str(top10))
 
             video_victoria()
-
-            juego.after(4000, lambda: [messagebox.showinfo("JUEGO TERMINADO", "¡FELICITACIONES, USTED HA GANADO!"),juego.destroy()])
             return
 
         jugadas_realizadas.clear()
@@ -953,12 +985,12 @@ def jugar():
         iniciar.config(state="disabled")
         nombre_entry.config(state="readonly")
 
+        elementos_restringidos = obtener_elementos_segun_dificultad(tipo_de_elementos, dificultad_actual)
+
         if tipo_de_elementos == "colores":
-            conjunto_elementos = list(elementos["colores"].values())
-        elif tipo_de_elementos == "numeros":
-            conjunto_elementos = list(elementos["numeros"])
+            conjunto_elementos = list(elementos_restringidos.values())
         else:
-            conjunto_elementos = list(elementos["letras"])
+            conjunto_elementos = list(elementos_restringidos)
 
         combinacion_local_secreta = []
         for posicion_actual in range(combinacion_local):
@@ -1002,7 +1034,7 @@ def configurar():
         tk.Radiobutton(configuracion, text=nivel, variable=opcion_nivel, value=nivel, font=("Impact", 12), fg="white", bg="black", selectcolor="black").pack()
     tk.Label(configuracion, text="Tipo de elementos:", font=("Impact", 12), fg="white", bg="black").pack(pady=(10, 0))
     opciones = tk.StringVar(value="colores")
-    for tipo in ["colores", "numeros", "letras"]:
+    for tipo in ["colores", "numeros", "letras", "simbolos"]:
         tk.Radiobutton(configuracion, text=tipo.capitalize(), variable=opciones, value=tipo, font=("Impact", 12), fg="white", bg="black", selectcolor="black").pack()
     tk.Label(configuracion,text="Tipo de reloj:",font=("Impact", 12),fg="white",bg="black").place(x=30, y=0)
     valor_tipo_reloj = tk.StringVar(value="No")
@@ -1030,7 +1062,7 @@ def configurar():
         messagebox.showinfo("Configuración", "Opciones guardadas correctamente <3")
         configuracion.destroy()
 
-    tk.Button(configuracion, text="Guardar", font=("Impact", 12), fg="black", bg="light blue", command=guardar_configuracion).pack(pady=15)
+    tk.Button(configuracion, text="Guardar", font=("Impact", 12), fg="black", bg="light blue", command=guardar_configuracion).place(x=100, y=200)
 
 def top_10_resumen():
     """FUNCIÓN: MOSTRAR EL RESUMEN DEL TOP 10  
