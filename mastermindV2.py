@@ -8,6 +8,83 @@ import os
 import cv2 #esto es para la celebración
 import pygame #esto también es para la celebración
 
+class Marca:
+    """CLASE: REPRESENTA UNA MARCA REGISTRADA EN EL HISTORIAL  
+    ATRIBUTOS: NOMBRE DEL JUGADOR, TIEMPO TOTAL, COMBINACIÓN, FECHA, HORA Y NIVEL.  
+    MÉTODOS:  
+        - desplegar_marca_resumen(): Devuelve un resumen simple de la marca.  
+        - desplegar_marca_detalle(): Devuelve información detallada y completa de la marca.  
+    """
+
+    def __init__(self, jugador, tiempo_total, combinacion, fecha, hora, nivel):
+        self.jugador = jugador
+        self.tiempo_total = tiempo_total
+        self.combinacion = combinacion
+        self.fecha = fecha
+        self.hora = hora
+        self.nivel = nivel
+
+    def desplegar_marca_resumen(self):
+        return f"{self.jugador} - {self.tiempo_total} seg"
+
+    def desplegar_marca_detalle(self):
+        return f"{self.jugador} | {self.combinacion} | {self.fecha} {self.hora} | {self.tiempo_total} seg"
+
+
+class NodoABB:
+    """CLASE: NODO PARA EL ÁRBOL BINARIO DE BÚSQUEDA (ABB)  
+    ATRIBUTOS:  
+        - marca: Objeto de la clase Marca almacenado en el nodo.  
+        - izquierdo: Referencia al nodo hijo izquierdo.  
+        - derecho: Referencia al nodo hijo derecho.  
+    """
+
+    def __init__(self, marca):
+        self.marca = marca
+        self.izquierdo = None
+        self.derecho = None
+
+class ABB:
+    """CLASE: IMPLEMENTA UN ÁRBOL BINARIO DE BÚSQUEDA (ABB) PARA ORDENAR MARCAS POR TIEMPO  
+    MÉTODOS:  
+        - insertar_nodo(marca): Inserta una nueva marca en el árbol manteniendo el orden.  
+        - recorrer_arbol(): Retorna todas las marcas en orden ascendente (recorrido in-orden).  
+        - _insertar_recursivo(): Lógica interna recursiva de inserción.  
+        - _inorden(): Método recursivo del recorrido in-orden.  
+    """
+
+    def __init__(self):
+        self.raiz = None
+
+    def insertar_nodo(self, marca):
+        self.raiz = self._insertar_recursivo(self.raiz, marca)
+
+    def _insertar_recursivo(self, nodo, marca):
+        if nodo is None:
+            return NodoABB(marca)
+
+        if marca.tiempo_total < nodo.marca.tiempo_total:
+            nodo.izquierdo = self._insertar_recursivo(nodo.izquierdo, marca)
+        else:
+            nodo.derecho = self._insertar_recursivo(nodo.derecho, marca)
+
+        return nodo
+
+    def recorrer_arbol(self):
+        marcas = []
+        self._inorden(self.raiz, marcas)
+        return marcas
+
+    def _inorden(self, nodo, marcas):
+        if nodo:
+            self._inorden(nodo.izquierdo, marcas)
+            marcas.append(nodo.marca)
+            self._inorden(nodo.derecho, marcas)
+
+abb_facil = ABB()
+abb_medio = ABB()
+abb_dificil = ABB()
+
 datos_configuracion = []
 colores = {"azul": "#1F23F3", "mostaza": "#ECB731", "rojo": "#F31F1F", "verde": "#2CF325", "naranja": "#FC7A00", "amarillo": "#EEFF00"}
 numeros = (1, 2, 3, 4, 5, 6)
@@ -16,6 +93,14 @@ elementos = {"colores": colores,"numeros": numeros,"letras": letras,"simbolos": 
 cantidad_jugadas = 8
 
 def obtener_elementos_segun_dificultad(tipo, dificultad):
+    """FUNCIÓN: OBTENER ELEMENTOS FILTRADOS SEGÚN LA DIFICULTAD  
+    ENTRADAS:  
+        - tipo: Tipo de elementos ("colores", "numeros", "letras" o "simbolos").  
+        - dificultad: Nivel del juego ("Fácil", "Normal", "Difícil").  
+    SALIDAS:  
+        Lista o diccionario con los elementos permitidos para esa dificultad.  
+    """
+
     limites = {"Fácil": 4, "Normal": 5, "Difícil": 6}
     limite = limites.get(dificultad, 6)
 
@@ -42,6 +127,14 @@ archivo_configuracion = os.path.join(base_path, "mastermind2025configuración.da
 archivo_top10 = os.path.join(base_path, "mastermind2025top10.dat")
 
 def cargar_configuracion():
+    """FUNCIÓN: CARGAR CONFIGURACIÓN DESDE ARCHIVO  
+    ENTRADAS: NINGUNA (LEE EL ARCHIVO mastermind2025configuración.dat SI EXISTE).  
+    SALIDAS:  
+        - Actualiza la lista datos_configuracion.  
+        - Carga símbolos personalizados si aplica.  
+        - Restaura valores por defecto si el archivo no existe o está incompleto.  
+    """
+
     if os.path.exists(archivo_configuracion):
         with open(archivo_configuracion, "r", encoding="utf-8") as archivo:
             lineas = archivo.read().splitlines()
@@ -235,6 +328,18 @@ def jugar():
     dificultad_actual = datos_configuracion[0]
     tipo_de_elementos = datos_configuracion[1]
     tipo_reloj = datos_configuracion[2]
+    
+    if datos_configuracion[0] == "Multinivel":
+        if hasattr(juego, "nivel_actual"):
+            dificultad_actual = juego.nivel_actual
+        else:
+            dificultad_actual = "Fácil"
+    else:
+        dificultad_actual = datos_configuracion[0]
+
+    juego.nivel_actual = dificultad_actual
+
+    
     if len(datos_configuracion) >= 4:
         posicion_panel = datos_configuracion[3]
     else:
@@ -539,6 +644,22 @@ def jugar():
 
             fecha_actual = datetime.datetime.now().strftime("%d/%m/%Y")
             hora_actual = datetime.datetime.now().strftime("%I:%M %p")
+
+            nueva_marca = Marca(
+                jugador=nombre_jugador,
+                tiempo_total=int(tiempo_total_segundos),
+                combinacion=combinacion_final,
+                fecha=fecha_actual,
+                hora=hora_actual,
+                nivel=dificultad_actual
+            )
+            if dificultad_actual == "Fácil":
+                abb_facil.insertar_nodo(nueva_marca)
+            elif dificultad_actual == "Normal":
+                abb_medio.insertar_nodo(nueva_marca)
+            else:
+                abb_dificil.insertar_nodo(nueva_marca)
+
             combinacion_texto_lista = []
             for elemento_en_combinacion in combinacion_secreta:
                 if tipo_de_elementos == "colores":
@@ -581,25 +702,26 @@ def jugar():
             with open(archivo_top10, "w", encoding="utf-8") as archivo:
                 archivo.write(str(top10))
 
-            video_victoria()
-            if dificultad_actual == "Multinivel":
+            if datos_configuracion[0] == "Multinivel":
                 niveles = ["Fácil", "Normal", "Difícil"]
-
-                indice = niveles.index(juego.nivel_actual)
+                nivel_actual = juego.nivel_actual.replace("Medio", "Normal")
+                indice = niveles.index(nivel_actual)
 
                 if indice < 2:
                     siguiente = niveles[indice + 1]
                     messagebox.showinfo("AVANCE DE NIVEL", f"¡Has pasado al nivel {siguiente}!")
-                    
+
                     datos_configuracion[0] = "Multinivel"
+
                     juego.destroy()
                     jugar_multinivel(siguiente)
-
-                else:
-                    messagebox.showinfo("FIN", "Estás en el último nivel (Difícil). Continuarás jugando aquí.")
-                    juego.destroy()
-            else:
+                    return
+                video_victoria()
+                juego.destroy()
                 return
+
+            video_victoria()
+            return
 
         jugadas_realizadas.clear()
         jugadas_deshechas.clear()
@@ -929,6 +1051,9 @@ def jugar():
 
 
     def habilitar_fila(numero_fila_activa):
+        if not juego.winfo_exists():
+            return
+
         for indice_fila, fila_jugada in enumerate(lista_jugadas):
             for casilla_canvas in fila_jugada[:combinacion_local]:
                 if indice_fila == numero_fila_activa:
@@ -1057,15 +1182,18 @@ def jugar_multinivel(nivel_siguiente):
     ENTRADAS: nivel_siguiente -> "Fácil", "Normal" o "Difícil".
     SALIDAS: Abre una nueva ventana de juego con la dificultad ajustada.
     """
-    datos_configuracion[0] = nivel_siguiente
+    datos_configuracion[0] = nivel_siguiente  
     jugar()
 
-
 def configurar():
-    """FUNCIÓN: CONFIGURAR LOS PARÁMETROS DEL JUEGO  
-    ENTRADAS: SELECCIONES DEL USUARIO (NIVEL DE DIFICULTAD, TIPO DE ELEMENTOS, TIPO DE RELOJ, POSICIÓN DEL PANEL).  
-    SALIDAS: GUARDA LAS OPCIONES ELEGIDAS EN EL ARCHIVO ‘mastermind2025configuracion.dat’ Y ACTUALIZA LA LISTA DE CONFIGURACIÓN.  """
-
+    """FUNCIÓN: CONFIGURAR PARÁMETROS DEL JUEGO  
+    ENTRADAS:  
+        Opciones seleccionadas por el usuario (dificultad, elementos, reloj, posición, repetidos).  
+    SALIDAS:  
+        - Guarda las opciones en el archivo mastermind2025configuración.dat.  
+        - Actualiza la estructura datos_configuracion.  
+        - Permite definir símbolos personalizados.  
+    """
     configuracion = tk.Toplevel(mastermind)
     configuracion.title("MasterMindV2: Configurar")
     configuracion.geometry("650x356")
@@ -1113,36 +1241,23 @@ def configurar():
             for dato in datos_configuracion:
                 archivo.write(str(dato) + "\n")
 
-    def guardar_configuracion():
+
+
+    def confirmar_guardado():
         datos_configuracion.clear()
-        datos_configuracion.append(opcion_nivel.get())
-        datos_configuracion.append(opciones.get())
-        datos_configuracion.append(valor_tipo_reloj.get())
-        datos_configuracion.append(valor_posicion.get())
-        datos_configuracion.append(opcion_repetidos.get())
+        datos_configuracion.append(opcion_nivel.get())        
+        datos_configuracion.append(opciones.get())               
+        datos_configuracion.append(valor_tipo_reloj.get())      
+        datos_configuracion.append(valor_posicion.get())       
+        datos_configuracion.append(opcion_repetidos.get()) 
         if opciones.get() == "simbolos":
-            entrada_simbolos = simpledialog.askstring(
-                "Símbolos personalizados",
-                "Ingrese símbolos separados por comas:"
-            )
-
-            if not entrada_simbolos:
-                messagebox.showerror("ERROR", "Debe ingresar al menos un símbolo.")
-                return
-
-            simbolos_procesados = []
-            for simbolo in entrada_simbolos.split(","):
-                limpio = simbolo.strip()
-                if limpio and limpio not in simbolos_procesados:
-                    simbolos_procesados.append(limpio)
-
-            for simbolo in simbolos_procesados:
-                if len(simbolo) != 1:
-                    messagebox.showerror("ERROR", f"El símbolo '{simbolo}' no es de 1 caracter.")
-                    return
-
-            elementos["simbolos"] = simbolos_procesados
-            datos_configuracion.append(",".join(simbolos_procesados))
+            entrada_simbolos = simpledialog.askstring("Símbolos personalizados","Ingrese símbolos separados por comas:")
+            if entrada_simbolos:
+                simbolos_procesados = [s.strip() for s in entrada_simbolos.split(",") if s.strip()]
+                elementos["simbolos"] = simbolos_procesados
+                datos_configuracion.append(",".join(simbolos_procesados))
+            else:
+                datos_configuracion.append("")
         else:
             datos_configuracion.append("")
 
@@ -1150,167 +1265,60 @@ def configurar():
         messagebox.showinfo("Configuración", "Opciones guardadas correctamente <3")
         configuracion.destroy()
 
-    tk.Button(configuracion, text="Guardar", font=("Impact", 12), fg="black", bg="light blue", command=guardar_configuracion).place(x=100, y=200)
+    tk.Button(configuracion,text="Guardar",font=("Impact", 12),fg="black",bg="light blue",command=confirmar_guardado).place(x=100, y=200)
 
-def resumen_de_marcas ():
-    """FUNCIÓN: MOSTRAR EL RESUMEN DEL TOP 10  
-    ENTRADAS: ARCHIVO ‘mastermind2025top10.dat’ CON LAS MEJORES PARTIDAS REGISTRADAS.  
-    SALIDAS: GENERA EL ARCHIVO ‘mastermind2025top10resumen.pdf’ CON NOMBRES Y TIEMPOS GENERALES. """
+def resumen_de_marcas():
+    """FUNCIÓN: MOSTRAR LISTA RESUMIDA DE TODAS LAS MARCAS REGISTRADAS  
+    ENTRADAS: NINGUNA.  
+    SALIDAS:  
+        - Abre una ventana con todas las marcas ordenadas por tiempo (ABB).  
+        - Se muestran únicamente nombre del jugador y tiempo total.  
+    """
 
-    base_path = os.path.dirname(os.path.abspath(__file__))
-    archivo_top10 = os.path.join(base_path, "mastermind2025top10.dat")
+    ventana = tk.Toplevel(mastermind)
+    ventana.title("Resumen de Marcas")
+    ventana.geometry("450x500")
+    ventana.config(bg="black")
 
-    if not os.path.exists(archivo_top10):
-        messagebox.showwarning("ADVERTENCIA", "NO EXISTE INFORMACIÓN DEL TOP 10.")
-        return
+    tk.Label(ventana, text="RESUMEN DE MARCAS", font=("Impact", 16), fg="white", bg="black").pack(pady=10)
 
-    ventana_nivel = tk.Toplevel(mastermind)
-    ventana_nivel.title("Resumen de Marcas ")
-    ventana_nivel.geometry("400x250")
-    ventana_nivel.config(bg="black")
+    def mostrar(nivel, abb):
+        tk.Label(ventana, text=f"--- NIVEL {nivel.upper()} ---", fg="yellow", bg="black", font=("Impact", 12)).pack()
+        marcas = abb.recorrer_arbol()
+        if not marcas:
+            tk.Label(ventana, text="Sin marcas registradas", fg="white", bg="black").pack()
+        for marca in marcas:
+            tk.Label(ventana, text=marca.desplegar_marca_resumen(), fg="white", bg="black").pack()
 
-    nivel_seleccionado = tk.StringVar(value="Todos")
-    opciones = ["Todos", "Difícil", "Medio", "Fácil"]
-    tk.Label(ventana_nivel, text="INFORMACIÓN DE:", font=("Impact", 14), bg="black", fg="white").pack(pady=10)
-    for nivel in opciones:
-        tk.Radiobutton(ventana_nivel, text=f"NIVEL {nivel.upper()}", variable=nivel_seleccionado, value=nivel,font=("Impact", 12), bg="black", fg="white", selectcolor="purple").pack(anchor="w", padx=40)
-
-    def generar_pdf():
-        base_path = os.path.dirname(__file__)
-        pdf_nombre = os.path.join(base_path, "mastermind2025top10resumen.pdf")
-        pdf = canvas.Canvas(pdf_nombre)
-        pdf.setFont("Helvetica", 12)
-        pdf.drawString(200, 800, "TOP 10 MASTERMIND – RESUMEN")
-        pdf.setFont("Helvetica", 12)
-        posicion_vertical = 770
-
-        with open(archivo_top10, "r", encoding="utf-8") as archivo:
-            contenido = archivo.read().strip()
-            if not contenido:
-                messagebox.showwarning("ADVERTENCIA", "NO HAY REGISTROS DISPONIBLES.")
-                return
-            try:
-                top10 = eval(contenido)
-            except Exception:
-                messagebox.showwarning("ADVERTENCIA", "EL ARCHIVO DEL TOP 10 ESTÁ DAÑADO.")
-                return
-
-        niveles_a_mostrar = ["Difícil", "Medio", "Fácil"] if nivel_seleccionado.get() == "Todos" else [nivel_seleccionado.get()]
-
-        for nivel_actual in niveles_a_mostrar:
-            pdf.setFont("Helvetica", 12)
-            pdf.drawString(100, posicion_vertical, f"TOP 10: NIVEL {nivel_actual.upper()}")
-            posicion_vertical -= 20
-            pdf.setFont("Helvetica", 12)
-            pdf.drawString(100, posicion_vertical, "JUGADOR")
-            pdf.drawString(350, posicion_vertical, "TIEMPO TOTAL")
-            posicion_vertical -= 20
-
-            jugadores_nivel = top10.get(nivel_actual, [])
-            if not jugadores_nivel:
-                pdf.setFont("Helvetica", 12)
-                pdf.drawString(100, posicion_vertical, "NO HAY REGISTROS DISPONIBLES.")
-                posicion_vertical -= 30
-                continue
-
-            for indice, jugador in enumerate(jugadores_nivel, start=1):
-                nombre = jugador[0]
-                pdf.drawString(100, posicion_vertical, f"{indice}- {nombre}")
-                pdf.drawString(350, posicion_vertical, "00:00:00")
-                posicion_vertical -= 20
-                if posicion_vertical < 50:
-                    pdf.showPage()
-                    pdf.setFont("Helvetica", 12)
-                    pdf.drawString(200, 800, "TOP 10 MASTERMIND – RESUMEN")
-                    posicion_vertical = 770
-
-            posicion_vertical -= 30
-
-        pdf.save()
-        os.startfile(pdf_nombre)
-        ventana_nivel.destroy()
-        messagebox.showinfo("PDF GENERADO", f"SE CREÓ EL ARCHIVO '{pdf_nombre}'.")
-
-    tk.Button(ventana_nivel, text="Generar PDF", font=("Impact", 12), bg="light blue",command=generar_pdf).pack(pady=20)
+    mostrar("Fácil", abb_facil)
+    mostrar("Normal", abb_medio)
+    mostrar("Difícil", abb_dificil)
 
 def detalle_de_marcas():
-    """FUNCIÓN: MOSTRAR EL DETALLE DEL TOP 10  
-    ENTRADAS: ARCHIVO ‘mastermind2025top10.dat’ QUE CONTIENE TODA LA INFORMACIÓN DEL HISTORIAL DEL TOP 10.  
-    SALIDAS: CREA EL DOCUMENTO ‘mastermind2025top10detalle.pdf’ CON NOMBRE, COMBINACIÓN, FECHA Y HORA DE CADA PARTIDA. """
+    """FUNCIÓN: MOSTRAR DETALLE COMPLETO DE MARCAS REGISTRADAS  
+    ENTRADAS: NINGUNA.  
+    SALIDAS:  
+        - Abre una ventana con información detallada: jugador, combinación, fecha, hora y tiempo.  
+        - Extrae datos ordenados desde el ABB correspondiente.  
+    """
+    ventana = tk.Toplevel(mastermind)
+    ventana.title("Detalle de Marcas")
+    ventana.geometry("700x500")
+    ventana.config(bg="black")
 
-    base_path = os.path.dirname(os.path.abspath(__file__))
-    archivo_top10 = os.path.join(base_path, "mastermind2025top10.dat")
+    tk.Label(ventana, text="DETALLE DE MARCAS", font=("Impact", 16), fg="white", bg="black").pack(pady=10)
 
-    if not os.path.exists(archivo_top10):
-        messagebox.showwarning("ADVERTENCIA", "NO EXISTE INFORMACIÓN DEL TOP 10.")
-        return
+    def mostrar(nivel, abb):
+        tk.Label(ventana, text=f"--- NIVEL {nivel.upper()} ---", fg="cyan", bg="black", font=("Impact", 12)).pack()
+        marcas = abb.recorrer_arbol()
+        if not marcas:
+            tk.Label(ventana, text="Sin marcas registradas", fg="white", bg="black").pack()
+        for marca in marcas:
+            tk.Label(ventana, text=marca.desplegar_marca_detalle(), fg="white", bg="black").pack()
 
-    ventana_detalle = tk.Toplevel(mastermind)
-    ventana_detalle.title("Detalle de Marcas")
-    ventana_detalle.geometry("400x250")
-    ventana_detalle.config(bg="black")
-
-    seleccion_nivel = tk.StringVar(value="Todos")
-    opciones = ["Todos", "Difícil", "Medio", "Fácil"]
-    tk.Label(ventana_detalle, text="INFORMACIÓN DE:", font=("Impact", 14), bg="black", fg="white").pack(pady=10)
-    for nivel in opciones:
-        tk.Radiobutton(ventana_detalle, text=f"NIVEL {nivel.upper()}", variable=seleccion_nivel, value=nivel,font=("Impact", 12), bg="black", fg="white", selectcolor="purple").pack(anchor="w", padx=40)
-
-    def generar_pdf():
-        base_path = os.path.dirname(__file__)
-        pdf_nombre = os.path.join(base_path, "mastermind2025top10detalle.pdf")
-        pdf = canvas.Canvas(pdf_nombre)
-        pdf.setFont("Helvetica", 12)
-        pdf.drawString(200, 800, "TOP 10 MASTERMIND – DETALLE")
-        pdf.setFont("Helvetica", 12)
-        posicion_vertical = 770
-
-        with open(archivo_top10, "r", encoding="utf-8") as archivo:
-            contenido = archivo.read().strip()
-            if not contenido:
-                messagebox.showwarning("ADVERTENCIA", "NO HAY REGISTROS DISPONIBLES.")
-                return
-            top10 = eval(contenido)
-
-        niveles_a_incluir = ["Difícil", "Medio", "Fácil"] if seleccion_nivel.get() == "Todos" else [seleccion_nivel.get()]
-        for nivel in niveles_a_incluir:
-            pdf.setFont("Helvetica", 12)
-            pdf.drawString(100, posicion_vertical, f"TOP 10: NIVEL {nivel.upper()}")
-            posicion_vertical -= 20
-            pdf.setFont("Helvetica", 10)
-            pdf.drawString(70, posicion_vertical, "JUGADOR")
-            pdf.drawString(210, posicion_vertical, "COMBINACIÓN")
-            pdf.drawString(350, posicion_vertical, "FECHA / HORA")
-            posicion_vertical -= 15
-
-            jugadores_nivel = top10.get(nivel, [])
-            if not jugadores_nivel:
-                pdf.drawString(100, posicion_vertical, "NO HAY REGISTROS DISPONIBLES.")
-                posicion_vertical -= 30
-                continue
-
-            for indice, jugador in enumerate(jugadores_nivel, start=1):
-                nombre = jugador[0]
-                combinacion = jugador[1]
-                fecha = jugador[2]
-                hora = jugador[3]
-                pdf.drawString(70, posicion_vertical, f"{indice}- {nombre}")
-                pdf.drawString(210, posicion_vertical, combinacion)
-                pdf.drawString(350, posicion_vertical, f"{fecha} {hora}")
-                posicion_vertical -= 15
-                if posicion_vertical < 80:
-                    pdf.showPage()
-                    posicion_vertical = 800
-
-            posicion_vertical -= 30
-
-        pdf.save()
-        os.startfile(pdf_nombre)
-        ventana_detalle.destroy()
-        messagebox.showinfo("PDF GENERADO", f"SE CREÓ EL ARCHIVO '{pdf_nombre}'.")
-
-    tk.Button(ventana_detalle, text="Generar PDF", font=("Impact", 12), bg="light blue",
-              command=generar_pdf).pack(pady=20)
+    mostrar("Fácil", abb_facil)
+    mostrar("Normal", abb_medio)
+    mostrar("Difícil", abb_dificil)
 
 def ayuda():
     """FUNCIÓN: MOSTRAR AYUDA AL USUARIO  
