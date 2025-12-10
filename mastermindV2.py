@@ -1,5 +1,5 @@
 import tkinter as tk
-from tkinter import messagebox
+from tkinter import messagebox, simpledialog
 from PIL import Image, ImageTk, ImageSequence  #esto es por motivos estéticos y requiere instalación
 import random
 import datetime
@@ -25,6 +25,8 @@ def obtener_elementos_segun_dificultad(tipo, dificultad):
         return numeros[:limite]
     elif tipo == "letras":
         return letras[:limite]
+    elif tipo == "simbolos":
+        return elementos["simbolos"][:limite]
     return []
 
 dificultad = ("Fácil", "Normal", "Difícil")
@@ -43,12 +45,32 @@ def cargar_configuracion():
     if os.path.exists(archivo_configuracion):
         with open(archivo_configuracion, "r", encoding="utf-8") as archivo:
             lineas = archivo.read().splitlines()
-            if len(lineas) >= 4:
-                datos_configuracion.clear()
-                datos_configuracion.extend(lineas)
-                return
-    datos_configuracion.clear()
-    datos_configuracion.extend(["Difícil", "colores", "No", "Derecha"])
+
+        if len(lineas) < 4:
+            datos_configuracion.clear()
+            datos_configuracion.extend(["Difícil", "colores", "No", "Derecha", "No", ""])
+        else:
+            if len(lineas) == 4:
+                lineas.append("No")
+                lineas.append("")
+            elif len(lineas) == 5:
+                lineas.append("")
+
+            datos_configuracion.clear()
+            datos_configuracion.extend(lineas[:6])
+
+        if len(datos_configuracion) >= 6 and datos_configuracion[5].strip():
+            simbolos_guardados = datos_configuracion[5].strip()
+            elementos["simbolos"] = [
+                s.strip() for s in simbolos_guardados.split(",") if s.strip()
+            ]
+        else:
+            elementos["simbolos"] = []
+
+    else:
+        datos_configuracion.clear()
+        datos_configuracion.extend(["Difícil", "colores", "No", "Derecha", "No", ""])
+        elementos["simbolos"] = []
 
 ruta_gif = os.path.join(base_path, "fondo.gif")  
 gif = Image.open(ruta_gif)
@@ -146,7 +168,6 @@ def jugar():
     juego.title("MasterMindV2: JUGAR")
     juego.geometry("1000x600")
     juego.config(background="black")
-    #copy paste de lo del gif, solo lo adapté
     ruta_gif_juego = os.path.join(base_path, "fondo_juego.gif")
     gif_juego = Image.open(ruta_gif_juego)
     frames_juego = [ImageTk.PhotoImage(frame.copy()) for frame in ImageSequence.Iterator(gif_juego)] 
@@ -218,6 +239,11 @@ def jugar():
         posicion_panel = datos_configuracion[3]
     else:
         posicion_panel = "Derecha"
+
+    if len(datos_configuracion) >= 5:
+        permitir_repetidos = datos_configuracion[4]
+    else:
+        permitir_repetidos = "No"
 
     combinacion_local = {"Fácil": 4, "Normal": 5, "Difícil": 6}.get(dificultad_actual, 6)
 
@@ -301,7 +327,7 @@ def jugar():
         if tipo_elemento == "colores":
             casilla_canvas.create_oval(5, 5, 25, 25, fill=valor_elemento, outline="black")
 
-        elif tipo_elemento in ["numeros", "letras"]:
+        elif tipo_elemento in ["numeros", "letras", "simbolos"]:
             casilla_canvas.create_text(15, 15, text=str(valor_elemento), font=("Impact", 12), fill="black")
 
         elif tipo_elemento == "borrador":
@@ -441,13 +467,7 @@ def jugar():
 
             if tipo_reloj == "Cronómetro":
                 tiempo_total_segundos = tiempo_transcurrido
-            elif tipo_reloj == "Temporizador":
-                if dificultad_actual == "Fácil":
-                    tiempo_total_segundos = 120 - tiempo_restante
-                elif dificultad_actual == "Normal":
-                    tiempo_total_segundos = 90 - tiempo_restante
-                else:
-                    tiempo_total_segundos = 60 - tiempo_restante
+
             else:
                 tiempo_total_segundos = tiempo_transcurrido
 
@@ -562,7 +582,24 @@ def jugar():
                 archivo.write(str(top10))
 
             video_victoria()
-            return
+            if dificultad_actual == "Multinivel":
+                niveles = ["Fácil", "Normal", "Difícil"]
+
+                indice = niveles.index(juego.nivel_actual)
+
+                if indice < 2:
+                    siguiente = niveles[indice + 1]
+                    messagebox.showinfo("AVANCE DE NIVEL", f"¡Has pasado al nivel {siguiente}!")
+                    
+                    datos_configuracion[0] = "Multinivel"
+                    juego.destroy()
+                    jugar_multinivel(siguiente)
+
+                else:
+                    messagebox.showinfo("FIN", "Estás en el último nivel (Difícil). Continuarás jugando aquí.")
+                    juego.destroy()
+            else:
+                return
 
         jugadas_realizadas.clear()
         jugadas_deshechas.clear()
@@ -643,19 +680,21 @@ def jugar():
             juego.after(1000, actualizar_tiempo)
 
     def iniciar_tiempo():
-        nonlocal tiempo_restante, cronometro_activo
+        nonlocal tiempo_restante, cronometro_activo, tipo_reloj
 
         if tipo_reloj == "Cronómetro":
             cronometro_activo = True
             actualizar_tiempo()
 
         elif tipo_reloj == "Temporizador":
-            if dificultad_actual == "Fácil":
-                tiempo_restante = 120
-            elif dificultad_actual == "Normal":
-                tiempo_restante = 90
-            else:
-                tiempo_restante = 60
+            tiempo_usuario = simpledialog.askinteger("Temporizador","Ingrese el tiempo en segundos:",minvalue=1,parent=juego)
+
+            if tiempo_usuario is None:
+                tipo_reloj = "No"
+                frame_reloj.place_forget()
+                return
+
+            tiempo_restante = int(tiempo_usuario)
             label_tiempo.config(text=formatear_tiempo(tiempo_restante))
             actualizar_tiempo()
 
@@ -993,8 +1032,15 @@ def jugar():
             conjunto_elementos = list(elementos_restringidos)
 
         combinacion_local_secreta = []
+        repetidos_permitidos = (permitir_repetidos == "Sí")
+
         for posicion_actual in range(combinacion_local):
             elemento_aleatorio = random.choice(conjunto_elementos)
+
+            if not repetidos_permitidos:
+                while elemento_aleatorio in combinacion_local_secreta:
+                    elemento_aleatorio = random.choice(conjunto_elementos)
+
             combinacion_local_secreta.append(elemento_aleatorio)
 
         juego.combinacion_local_secreta = combinacion_local_secreta
@@ -1004,6 +1050,15 @@ def jugar():
 
         habilitar_fila(0)
     iniciar.config(command=iniciar_juego)
+
+def jugar_multinivel(nivel_siguiente):
+    """
+    FUNCIÓN: Inicia el siguiente nivel en modo Multinivel.
+    ENTRADAS: nivel_siguiente -> "Fácil", "Normal" o "Difícil".
+    SALIDAS: Abre una nueva ventana de juego con la dificultad ajustada.
+    """
+    datos_configuracion[0] = nivel_siguiente
+    jugar()
 
 
 def configurar():
@@ -1026,12 +1081,12 @@ def configurar():
 
     animar(configuracion, label_fondo, frames)
 
-    tk.Label(configuracion, text="CONFIGURACIÓN DE MASTERMIND",
-             font=("Impact", 16), fg="white", bg="black").pack(pady=10)
+    tk.Label(configuracion, text="CONFIGURACIÓN DE MASTERMIND",font=("Impact", 16), fg="white", bg="black").pack(pady=10)
     tk.Label(configuracion, text="Dificultad:", font=("Impact", 12), fg="white", bg="black").pack()
     opcion_nivel = tk.StringVar(value="Difícil")
-    for nivel in dificultad:
-        tk.Radiobutton(configuracion, text=nivel, variable=opcion_nivel, value=nivel, font=("Impact", 12), fg="white", bg="black", selectcolor="black").pack()
+    niveles_disponibles = ["Fácil", "Normal", "Difícil", "Multinivel"]
+    for nivel in niveles_disponibles:
+        tk.Radiobutton(configuracion, text=nivel, variable=opcion_nivel, value=nivel,font=("Impact", 12), fg="white", bg="black",selectcolor="black").pack()
     tk.Label(configuracion, text="Tipo de elementos:", font=("Impact", 12), fg="white", bg="black").pack(pady=(10, 0))
     opciones = tk.StringVar(value="colores")
     for tipo in ["colores", "numeros", "letras", "simbolos"]:
@@ -1046,6 +1101,12 @@ def configurar():
     opciones_posicion = [("Derecha", 30), ("Izquierda", 60)]
     for nombre_opcion, y in opciones_posicion:
         tk.Radiobutton(configuracion, text=nombre_opcion,variable=valor_posicion, value=nombre_opcion,font=("Impact", 12), fg="white", bg="black",selectcolor="black").place(x=520, y=y)
+    tk.Label(configuracion, text="Repetidos:", font=("Impact", 12), fg="white", bg="black").place(x=520, y=120)
+    opcion_repetidos = tk.StringVar(value="No")
+    tk.Radiobutton(configuracion, text="No", variable=opcion_repetidos, value="No",
+                font=("Impact", 12), fg="white", bg="black", selectcolor="black").place(x=520, y=140)
+    tk.Radiobutton(configuracion, text="Sí", variable=opcion_repetidos, value="Sí",
+                font=("Impact", 12), fg="white", bg="black", selectcolor="black").place(x=520, y=170)
 
     def guardar_configuracion_en_archivo():
         with open(archivo_configuracion, "w", encoding="utf-8") as archivo:
@@ -1058,13 +1119,40 @@ def configurar():
         datos_configuracion.append(opciones.get())
         datos_configuracion.append(valor_tipo_reloj.get())
         datos_configuracion.append(valor_posicion.get())
+        datos_configuracion.append(opcion_repetidos.get())
+        if opciones.get() == "simbolos":
+            entrada_simbolos = simpledialog.askstring(
+                "Símbolos personalizados",
+                "Ingrese símbolos separados por comas:"
+            )
+
+            if not entrada_simbolos:
+                messagebox.showerror("ERROR", "Debe ingresar al menos un símbolo.")
+                return
+
+            simbolos_procesados = []
+            for simbolo in entrada_simbolos.split(","):
+                limpio = simbolo.strip()
+                if limpio and limpio not in simbolos_procesados:
+                    simbolos_procesados.append(limpio)
+
+            for simbolo in simbolos_procesados:
+                if len(simbolo) != 1:
+                    messagebox.showerror("ERROR", f"El símbolo '{simbolo}' no es de 1 caracter.")
+                    return
+
+            elementos["simbolos"] = simbolos_procesados
+            datos_configuracion.append(",".join(simbolos_procesados))
+        else:
+            datos_configuracion.append("")
+
         guardar_configuracion_en_archivo()
         messagebox.showinfo("Configuración", "Opciones guardadas correctamente <3")
         configuracion.destroy()
 
     tk.Button(configuracion, text="Guardar", font=("Impact", 12), fg="black", bg="light blue", command=guardar_configuracion).place(x=100, y=200)
 
-def top_10_resumen():
+def resumen_de_marcas ():
     """FUNCIÓN: MOSTRAR EL RESUMEN DEL TOP 10  
     ENTRADAS: ARCHIVO ‘mastermind2025top10.dat’ CON LAS MEJORES PARTIDAS REGISTRADAS.  
     SALIDAS: GENERA EL ARCHIVO ‘mastermind2025top10resumen.pdf’ CON NOMBRES Y TIEMPOS GENERALES. """
@@ -1077,7 +1165,7 @@ def top_10_resumen():
         return
 
     ventana_nivel = tk.Toplevel(mastermind)
-    ventana_nivel.title("Top 10 - Resumen")
+    ventana_nivel.title("Resumen de Marcas ")
     ventana_nivel.geometry("400x250")
     ventana_nivel.config(bg="black")
 
@@ -1145,7 +1233,7 @@ def top_10_resumen():
 
     tk.Button(ventana_nivel, text="Generar PDF", font=("Impact", 12), bg="light blue",command=generar_pdf).pack(pady=20)
 
-def top_10_detalle():
+def detalle_de_marcas():
     """FUNCIÓN: MOSTRAR EL DETALLE DEL TOP 10  
     ENTRADAS: ARCHIVO ‘mastermind2025top10.dat’ QUE CONTIENE TODA LA INFORMACIÓN DEL HISTORIAL DEL TOP 10.  
     SALIDAS: CREA EL DOCUMENTO ‘mastermind2025top10detalle.pdf’ CON NOMBRE, COMBINACIÓN, FECHA Y HORA DE CADA PARTIDA. """
@@ -1158,7 +1246,7 @@ def top_10_detalle():
         return
 
     ventana_detalle = tk.Toplevel(mastermind)
-    ventana_detalle.title("Top 10 - Detalle")
+    ventana_detalle.title("Detalle de Marcas")
     ventana_detalle.geometry("400x250")
     ventana_detalle.config(bg="black")
 
@@ -1254,8 +1342,8 @@ def salir():
 menu = tk.Menu(mastermind)
 menu.add_command(label="Jugar", command=jugar)
 menu.add_command(label="Configurar", command=configurar)
-menu.add_command(label="Top 10 - Resumen", command=top_10_resumen)
-menu.add_command(label="Top 10 - Detalle", command=top_10_detalle)
+menu.add_command(label="Resumen de Marcas ", command=resumen_de_marcas)
+menu.add_command(label="Detalle de marcas ", command=detalle_de_marcas)
 menu.add_command(label="Ayuda", command=ayuda)
 menu.add_command(label="Acerca de", command=acerca_de)
 menu.add_command(label="Salir", command=salir)
